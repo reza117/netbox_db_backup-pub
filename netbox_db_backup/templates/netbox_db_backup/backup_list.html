@@ -1,0 +1,169 @@
+{% extends 'base/layout.html' %}
+
+{% block title %}Database Backups{% endblock %}
+
+{% block content %}
+  <div class="row align-items-center mb-3">
+    <div class="col">
+      <h1 class="page-title mb-0">Database Backups</h1>
+    </div>
+    <div class="col-auto">
+      <form method="post" action="{% url 'plugins:netbox_db_backup:backup_create' %}">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-primary" {% if not storage.enough or backup_running %}disabled{% endif %}>Create Backup</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="alert alert-info" role="status">
+    Current Running NetBox Version: <strong>{{ current_version }}</strong>
+  </div>
+
+  {% if backup_running %}
+    <div class="alert alert-info" role="status">A backup is running. This page refreshes every 5 seconds.</div>
+  {% endif %}
+
+  <div class="row row-cards mb-3">
+    <div class="col-sm-6 col-xl">
+      <div class="card">
+        <div class="card-body">
+          <div class="text-secondary">Free space</div>
+          <div class="h3 mb-0">{{ storage.free_display }}</div>
+          <div class="text-secondary">of {{ storage.total_display }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-sm-6 col-xl">
+      <div class="card">
+        <div class="card-body">
+          <div class="text-secondary">Database size</div>
+          <div class="h3 mb-0">{{ storage.required_display }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-sm-6 col-xl">
+      <div class="card">
+        <div class="card-body">
+          <div class="text-secondary">Reserve</div>
+          <div class="h3 mb-0">{{ storage.reserve_display }}</div>
+          <div class="text-secondary">stays free after the backup</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-sm-6 col-xl">
+      <div class="card">
+        <div class="card-body">
+          <div class="text-secondary">Space needed</div>
+          <div class="h3 mb-0">{{ storage.needed_display }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-sm-6 col-xl">
+      <div class="card {% if storage.enough %}border-success{% else %}border-warning{% endif %}">
+        <div class="card-body">
+          <div class="text-secondary">Status</div>
+          <div class="h3 mb-0">
+            {% if storage.enough %}
+              <span class="badge text-bg-success">{{ storage.status_label }}</span>
+            {% else %}
+              <span class="badge text-bg-warning">{{ storage.status_label }}</span>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {% if storage.path %}
+    <div class="text-secondary mb-3">Backup directory: {{ storage.path }}</div>
+  {% endif %}
+  {% if storage.reserve_note %}
+    <div class="alert alert-warning" role="status">{{ storage.reserve_note }}</div>
+  {% endif %}
+  {% if not storage.enough %}
+    <div class="alert alert-warning" role="status">{{ storage.warning }}</div>
+  {% endif %}
+
+  <div class="card">
+    <div class="table-responsive">
+      <table class="table table-hover card-table mb-0">
+        <thead>
+          <tr>
+            <th>Filename</th>
+            <th>Backup Date &amp; Time</th>
+            <th>File Size</th>
+            <th>NetBox Version</th>
+            <th>Running Version</th>
+            <th>Compatibility Status</th>
+            <th>Job Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for backup in backups %}
+            <tr>
+              <td>{{ backup.record.filename }}</td>
+              <td>{{ backup.record.created_at }}</td>
+              <td>
+                {% if backup.record.status == "completed" %}
+                  {{ backup.record.size_display }}
+                {% else %}
+                  —
+                {% endif %}
+              </td>
+              <td>{{ backup.record.netbox_version }}</td>
+              <td>{{ current_version }}</td>
+              <td>
+                {% if backup.record.status == "completed" %}
+                  {% if backup.compatible %}
+                    <span class="badge text-bg-success">Compatible</span>
+                  {% else %}
+                    <span class="badge text-bg-warning">Version Mismatch</span>
+                  {% endif %}
+                {% else %}
+                  —
+                {% endif %}
+              </td>
+              <td>
+                {% if backup.record.status == "running" %}
+                  <span class="badge text-bg-info">Running</span>
+                {% elif backup.record.status == "failed" %}
+                  <span class="badge text-bg-danger">Failed</span>
+                  {% if backup.record.error %}
+                    <div class="small text-danger mt-1">{{ backup.record.error }}</div>
+                  {% endif %}
+                {% else %}
+                  <span class="badge text-bg-success">Completed</span>
+                {% endif %}
+              </td>
+              <td class="text-nowrap">
+                {% if backup.record.status == "completed" %}
+                  <a class="btn btn-sm btn-primary" href="{% url 'plugins:netbox_db_backup:backup_download' pk=backup.record.pk %}">Download</a>
+                  <form method="post" action="{% url 'plugins:netbox_db_backup:backup_delete' pk=backup.record.pk %}" class="d-inline" onsubmit="return confirm('Delete this backup?');">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                  </form>
+                {% elif backup.record.status == "failed" %}
+                  <form method="post" action="{% url 'plugins:netbox_db_backup:backup_delete' pk=backup.record.pk %}" class="d-inline" onsubmit="return confirm('Delete this backup record?');">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                  </form>
+                {% else %}
+                  —
+                {% endif %}
+              </td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="8" class="text-muted">No backups yet.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {% if backup_running %}
+    <script>setTimeout(function () { window.location.reload(); }, 5000);</script>
+  {% endif %}
+{% endblock %}

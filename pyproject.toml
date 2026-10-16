@@ -1,0 +1,16 @@
+[project]
+name = "netbox-db-backup"
+version = "0.2.0"
+description = "Minimal NetBox plugin for PostgreSQL database backups."
+requires-python = ">=3.10"
+dependencies = []
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["netbox_db_backup*"]
+
+[tool.setuptools.package-data]
+netbox_db_backup = ["templates/netbox_db_backup/*.html"]
