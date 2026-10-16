@@ -1,0 +1,87 @@
+{% extends 'base/layout.html' %}
+
+{% block title %}Database Backups{% endblock %}
+
+{% block content %}
+  <div class="row align-items-center mb-3">
+    <div class="col">
+      <h1 class="page-title mb-0">Database Backups</h1>
+    </div>
+    <div class="col-auto">
+      <form method="post" action="{% url 'plugins:netbox_db_backup:backup_create' %}">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-primary" {% if not storage.enough %}disabled{% endif %}>Create Backup</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="alert alert-info" role="status">
+    Current Running NetBox Version: <strong>{{ current_version }}</strong>
+  </div>
+
+  <div class="alert {% if storage.enough %}alert-secondary{% else %}alert-warning{% endif %}" role="status">
+    <div>Host storage: <strong>{{ storage.free_display }}</strong> free of {{ storage.total_display }}{% if storage.path %} at {{ storage.path }}{% endif %}.</div>
+    <div>Database size: <strong>{{ storage.required_display }}</strong>.</div>
+    <div>Safety reserve: <strong>{{ storage.reserve_display }}</strong> must stay free after the backup.</div>
+    <div>Needed before backup: <strong>{{ storage.needed_display }}</strong>.</div>
+    {% if storage.reserve_note %}
+      <div>{{ storage.reserve_note }}</div>
+    {% endif %}
+    <div>
+      Status:
+      {% if storage.enough %}
+        <span class="badge text-bg-success">{{ storage.status_label }}</span>
+      {% else %}
+        <span class="badge text-bg-warning">{{ storage.status_label }}</span>
+        <div class="mt-2 mb-0">{{ storage.warning }}</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="table-responsive">
+      <table class="table table-hover card-table mb-0">
+        <thead>
+          <tr>
+            <th>Filename</th>
+            <th>Backup Date &amp; Time</th>
+            <th>File Size</th>
+            <th>NetBox Version</th>
+            <th>Running Version</th>
+            <th>Compatibility Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for backup in backups %}
+            <tr>
+              <td>{{ backup.record.filename }}</td>
+              <td>{{ backup.record.created_at }}</td>
+              <td>{{ backup.record.size_display }}</td>
+              <td>{{ backup.record.netbox_version }}</td>
+              <td>{{ current_version }}</td>
+              <td>
+                {% if backup.compatible %}
+                  <span class="badge text-bg-success">Compatible</span>
+                {% else %}
+                  <span class="badge text-bg-warning">Version Mismatch</span>
+                {% endif %}
+              </td>
+              <td class="text-nowrap">
+                <a class="btn btn-sm btn-primary" href="{% url 'plugins:netbox_db_backup:backup_download' pk=backup.record.pk %}">Download</a>
+                <form method="post" action="{% url 'plugins:netbox_db_backup:backup_delete' pk=backup.record.pk %}" class="d-inline" onsubmit="return confirm('Delete this backup?');">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                </form>
+              </td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="7" class="text-muted">No backups yet.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% endblock %}
